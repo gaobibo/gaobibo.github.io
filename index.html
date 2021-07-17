@@ -52,15 +52,15 @@
 <body>
   <header class="site-header">
     <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
-        <div class="container" style="height: 100px;">
-            <h4>Please select the true MRI images</h4>
+        <div class="container-fluid" style="height: 100px;">
+            <h4 class="text-white" id="intro_text"></h4>
           <div id="navi_pics">
           
           </div>
           <div>
               <div class="navbar-nav">
-                <a class="nav-item nav-link" href="#" onclick="backSample()">&#10096;Back</a>
-                <a class="nav-item nav-link" href="#" onclick="nextSample()">Next&#10097;</a>
+                <a class="nav-item nav-link" href="#" onclick="backSample()"><h4 class="text-white" id="back_text">&#10096;Back</h4></a>
+                <a class="nav-item nav-link" href="#" onclick="nextSample()"><h4 class="text-white" id="next_text">Next&#10097;</h4></a>
               </div>
           </div>
         </div>
@@ -77,8 +77,10 @@
 
 
   <script>
-    const ct_image_path = "./ct_images/"
-    const mri_image_path = "./mri_images/"
+    const ct_image_path = "./ct_images/";
+    const mri_image_path = "./mri_images/";
+    const max_ct_index = 82;
+    const max_pick_num = 4;
     
     const mri_models = ["unet_5_l1l2_50", 
                         "unet_3_mae_200", 
@@ -112,7 +114,6 @@
 
     function backSample() {
       if (ct_sample_index <= 1) {
-        alert("This is the first one, thank you!");
         return;
       }
 
@@ -132,10 +133,15 @@
     }
 
     function nextSample() {
-      if (ct_sample_index >= 8) {
-        alert("This is the last one, thank you!");
+      if (ct_sample_index >= max_ct_index) {
         console.log(evaluation);
+        if (!confirm('Are you sure you want to submit your evaluation into the database?')) {
+          return;
+        }
+        
         addEvaluation();
+        ct_sample_index = 0;
+        updateSample();
         return;
       }
 
@@ -155,13 +161,49 @@
     }
 
     function updateSample() {
+      // clean up the main pics area
       main_html = "";
       var main_pics = document.getElementById('main_pics');
       main_pics.innerHTML = main_html;
-     
+
+      // clean up the navi pics area
+      navi_html = "";
+      var navi_pics = document.getElementById('navi_pics');
+      navi_pics.innerHTML = navi_html;
+
+      // clean up the navi text area
+      var back_text = document.getElementById('back_text');
+      back_text.innerHTML = "";
+      var next_text = document.getElementById('next_text');
+      next_text.innerHTML = "";
+      var intro_text = document.getElementById('intro_text');
+      intro_text.innerHTML = "";
+
+      // update intro text area
+      if (ct_sample_index <= 0) {
+        intro_text.innerHTML = 'Thank you for your submission. If you want to resubmit, please click <a href="./index-firebase2.html">here</a>';
+        return;
+      } else {
+        intro_text.innerHTML = "Please select true MRI images in set " + ct_sample_index + " of " + max_ct_index;
+      }
+
+      // update back text area
+      if (ct_sample_index > 1) {
+        back_text.innerHTML = "&#10096;Back";
+      }
+
+      // update next text area
+      if (ct_sample_index == max_ct_index) {
+        next_text.innerHTML = "Submit&#10097;";
+      } else {
+        next_text.innerHTML = "Next&#10097;";
+      }
+      
+      // update the main pics area
       for (let i = 0; i < mri_models.length; i++) {
  
         const mri_sample_path = mri_models[i] + "/" + (ct_sample_index-1).pad(4) + "_sharp_conserv.png";
+
         var captured_ct_index = ct_sample_index;
         storageRef.child(mri_sample_path).getDownloadURL().then(function(url) {
           if (captured_ct_index != ct_sample_index) {
@@ -174,27 +216,24 @@
           }
 
           main_html += '<div class="card float-left" style="width:256px">' + 
-                     '<div class="card-body" ' + picked_style + ' id="' + url + '">' + 
-                     '<h4 class="card-title">' + ( i + 1 ) + '</h4>' + 
-                     //'<h4 class="card-title">' + mri_models[i] + '</h4>' + 
-                     '</div>' + 
-                     '<img class="card-img-bottom" src="' + url + '" alt="Card image" style="width:100%" onclick="clickImage(\'' + url + '\',' + i + ')">' + 
-                     '</div>';
+                       '<div class="card-body" ' + picked_style + ' id="' + url + '">' + 
+                       '<h4 class="card-title">' + ( i + 1 ) + '</h4>' + 
+                       '</div>' + 
+                       '<img class="card-img-bottom" src="' + url + '" alt="Card image" style="width:100%" onclick="clickImage(\'' + url + '\',' + i + ')">' + 
+                       '</div>';
 
           main_pics.innerHTML = main_html;
         }).catch(function(error) {
         // Handle any errors
         });
       }
-     
-      navi_html = "";
+      
+      // update the navi pics area
       for (let i = 0; i < picked_pics.length; i++) {
         navi_html += '<div class="card float-left" style="width:100px">' + 
                      '<img class="card-img-top" src="' + picked_pics[i] + '" alt="Card image">' + 
                      '</div>';
       }
-
-      var navi_pics = document.getElementById('navi_pics');
       navi_pics.innerHTML = navi_html;
     }
   
@@ -211,12 +250,13 @@
         picked_pics.splice(duplicated, 1);
         picked_mods.splice(duplicated, 1);
         document.getElementById(pic_path).style.backgroundColor ='#FFFFFF';
-      } else if (picked_pics.length < 6) {
+      } else if (picked_pics.length < max_pick_num) {
         picked_pics.push(pic_path);
         picked_mods.push(index);
         document.getElementById(pic_path).style.backgroundColor ='#04AA6D';
       } else {
-        alert("You can only pick 5 MRI images!");
+        var message = "You can only pick " + max_pick_num + " MRI images!";
+        alert(message);
         return;
       }
 
