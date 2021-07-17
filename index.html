@@ -1,10 +1,241 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Hello World<title>
+  <title>CT2MRI Images Survey</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/5.9.4/firebase.js"></script>
+  <!-- The core Firebase JS SDK is always required and must be listed first -->
+  <script src="https://www.gstatic.com/firebasejs/7.3.0/firebase-app.js"></script>
+
+  <!-- TODO: Add SDKs for Firebase products that you want to use
+  https://firebase.google.com/docs/web/setup#available-libraries -->
+  <script src="https://www.gstatic.com/firebasejs/7.3.0/firebase-analytics.js"></script>
+  <!-- Add Firebase products that you want to use -->
+  <script src="https://www.gstatic.com/firebasejs/6.1.1/firebase-auth.js"></script>
+
+<script src="https://www.gstatic.com/firebasejs/6.1.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/6.1.1/firebase-storage.js"></script>
+
 </head>
+<script>
+  var firebaseConfig = {
+    apiKey: "AIzaSyBYFhbfazIWCFZhmUQaW5s8GArmxRNKaLo",
+    authDomain: "ct2mri-95fc6.firebaseapp.com",
+    databaseURL: "https://ct2mri-95fc6-default-rtdb.firebaseio.com",
+    projectId: "ct2mri-95fc6",
+    storageBucket: "ct2mri-95fc6.appspot.com",
+    messagingSenderId: "717539683589",
+    appId: "1:717539683589:web:536c1630a895805ca5db6c",
+    measurementId: "G-RWYJ57ZW44"
+  };
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  var storageRef = firebase.storage().ref();
+  
+  function handleDownloadProcess(filePath) {
+    storageRef.child(filePath).getDownloadURL().then(function(url) {
+      alert(url);
+      return url;
+    }).catch(function(error) {
+    // Handle any errors
+    });
+  }
+</script>
+
 <body>
-  <h1>Hello World</h1>
+  <header class="site-header">
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
+        <div class="container" style="height: 100px;">
+            <h4>Please select the true MRI images</h4>
+          <div id="navi_pics">
+          
+          </div>
+          <div>
+              <div class="navbar-nav">
+                <a class="nav-item nav-link" href="#" onclick="backSample()">&#10096;Back</a>
+                <a class="nav-item nav-link" href="#" onclick="nextSample()">Next&#10097;</a>
+              </div>
+          </div>
+        </div>
+    </nav>
+  </header>
+
+  <main role="main" class="container-fluid" style="margin-top:110px">
+    <div class="row">
+      <div id="main_pics" class="container_fluid">
+
+      </div>
+    </div>
+  </main>
+
+
+  <script>
+    const ct_image_path = "./ct_images/"
+    const mri_image_path = "./mri_images/"
+    
+    const mri_models = ["unet_5_l1l2_50", 
+                        "unet_3_mae_200", 
+                        "unet_5_mae_150", 
+                        "resnet_15_3_mae_50", 
+                        "resnet_12_5_mae_100", 
+                        "resnet_9_5_l1l2_50", 
+                        "resnet_15_3_p_50", 
+                        "resnet_12_5_ssim_50"];
+  
+    var ct_sample_index = 0;
+    var picked_pics = [];
+    var picked_mods = [];
+    var results = [];
+    var evaluation = {};
+
+    function addEvaluation(  )
+    {
+      var firebaseRef = firebase.database().ref();
+      var newKey = firebaseRef.child('evaluation').push().key;
+      var updates = {};
+      updates['/evaluation/' + newKey] = evaluation;
+      firebaseRef.update(updates);  
+    }
+  
+    Number.prototype.pad = function(size) {
+      var s = String(this);
+      while (s.length < (size || 2)) {s = "0" + s;}
+      return s;
+    }
+
+    function backSample() {
+      if (ct_sample_index <= 1) {
+        alert("This is the first one, thank you!");
+        return;
+      }
+
+      ct_sample_index -= 1;
+      picked_pics = results[ct_sample_index];
+      picked_mods = evaluation[ct_sample_index];
+
+      if (picked_pics == null) {
+        picked_pics = [];
+      }
+
+      if (picked_mods == null) {
+        picked_mods = [];
+      }
+
+      updateSample();
+    }
+
+    function nextSample() {
+      if (ct_sample_index >= 8) {
+        alert("This is the last one, thank you!");
+        console.log(evaluation);
+        addEvaluation();
+        return;
+      }
+
+      ct_sample_index += 1;
+      picked_pics = results[ct_sample_index];
+      picked_mods = evaluation[ct_sample_index];
+
+      if (picked_pics == null) {
+        picked_pics = [];
+      }
+
+      if (picked_mods == null) {
+        picked_mods = [];
+      }
+
+      updateSample();
+    }
+
+    function updateSample() {
+      main_html = "";
+      var main_pics = document.getElementById('main_pics');
+      main_pics.innerHTML = main_html;
+     
+      for (let i = 0; i < mri_models.length; i++) {
+ 
+        const mri_sample_path = mri_models[i] + "/" + (ct_sample_index-1).pad(4) + "_sharp_conserv.png";
+        var captured_ct_index = ct_sample_index;
+        storageRef.child(mri_sample_path).getDownloadURL().then(function(url) {
+          if (captured_ct_index != ct_sample_index) {
+            return; 
+          }
+
+          picked_style = '';
+          if (picked_pics.indexOf(url) != -1) {
+            picked_style = 'style="background-color:#04AA6D;"';
+          }
+
+          main_html += '<div class="card float-left" style="width:256px">' + 
+                     '<div class="card-body" ' + picked_style + ' id="' + url + '">' + 
+                     '<h4 class="card-title">' + ( i + 1 ) + '</h4>' + 
+                     //'<h4 class="card-title">' + mri_models[i] + '</h4>' + 
+                     '</div>' + 
+                     '<img class="card-img-bottom" src="' + url + '" alt="Card image" style="width:100%" onclick="clickImage(\'' + url + '\',' + i + ')">' + 
+                     '</div>';
+
+          main_pics.innerHTML = main_html;
+        }).catch(function(error) {
+        // Handle any errors
+        });
+      }
+     
+      navi_html = "";
+      for (let i = 0; i < picked_pics.length; i++) {
+        navi_html += '<div class="card float-left" style="width:100px">' + 
+                     '<img class="card-img-top" src="' + picked_pics[i] + '" alt="Card image">' + 
+                     '</div>';
+      }
+
+      var navi_pics = document.getElementById('navi_pics');
+      navi_pics.innerHTML = navi_html;
+    }
+  
+    function clickImage(pic_path, index) {
+      var duplicated = -1;
+      for (let i = 0; i < picked_pics.length; i++) {
+        if (picked_pics[i] == pic_path) {
+          duplicated = i;
+          break;
+        }
+      }
+
+      if (duplicated >= 0) {
+        picked_pics.splice(duplicated, 1);
+        picked_mods.splice(duplicated, 1);
+        document.getElementById(pic_path).style.backgroundColor ='#FFFFFF';
+      } else if (picked_pics.length < 6) {
+        picked_pics.push(pic_path);
+        picked_mods.push(index);
+        document.getElementById(pic_path).style.backgroundColor ='#04AA6D';
+      } else {
+        alert("You can only pick 5 MRI images!");
+        return;
+      }
+
+      results[ct_sample_index] = picked_pics;
+      evaluation[ct_sample_index] = picked_mods;
+
+      navi_html = "";
+      for (let i = 0; i < picked_pics.length; i++) {
+        navi_html += '<div class="card float-left" style="width:100px">' + 
+                     '<img class="card-img-top" src="' + picked_pics[i] + '" alt="Card image">' + 
+                     '</div>';
+      }
+
+      var navi_pics = document.getElementById('navi_pics');
+      navi_pics.innerHTML = navi_html;
+    }
+  
+    nextSample();
+  </script>
+
 </body>
 </html>
