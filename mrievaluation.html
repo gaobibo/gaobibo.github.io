@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>CT2MRI Images Survey</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/5.9.4/firebase.js"></script>
+  <!-- The core Firebase JS SDK is always required and must be listed first -->
+  <script src="https://www.gstatic.com/firebasejs/7.3.0/firebase-app.js"></script>
+
+  <!-- TODO: Add SDKs for Firebase products that you want to use
+  https://firebase.google.com/docs/web/setup#available-libraries -->
+  <script src="https://www.gstatic.com/firebasejs/7.3.0/firebase-analytics.js"></script>
+  <!-- Add Firebase products that you want to use -->
+  <script src="https://www.gstatic.com/firebasejs/6.1.1/firebase-auth.js"></script>
+
+  <script src="https://www.gstatic.com/firebasejs/6.1.1/firebase-database.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/6.1.1/firebase-storage.js"></script>
+
+  <script src="https://www.gstatic.com/firebasejs/ui/4.7.1/firebase-ui-auth.js"></script>
+  <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/4.7.1/firebase-ui-auth.css" />
+</head>
+
+<body>
+  <header class="site-header">
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
+        <div class="container-fluid" style="height: 100px;">
+            <h4 class="text-white" id="intro_text"></h4>
+          <div id="navi_pics">
+          
+          </div>
+          <div>
+              <div class="navbar-nav">
+                <a class="nav-item nav-link" href="#" onclick="backSample()" id="back_text" ><h4 class="text-white" ></h4></a>
+                <a class="nav-item nav-link" href="#" onclick="nextSample()" id="next_text"><h4 class="text-white" ></h4></a>
+                <a class="nav-item nav-link" href="#" onclick="logout()" id="logout"><h4 class="text-white" ></h4></a>
+              </div>
+          </div>
+        </div>
+    </nav>
+  </header>
+
+  <main role="main" class="container-fluid" style="margin-top:120px">
+    <div class="row" id="auth_login">
+        <div id="firebaseui-auth-container"></div>
+    </div>    
+    <div class="row" id="eval">
+      <div id="main_pics" class="container_fluid"></div>
+    </div>
+  </main>
+</body>
+
+<script>
+  var firebaseConfig = {
+    apiKey: "AIzaSyBYFhbfazIWCFZhmUQaW5s8GArmxRNKaLo",
+    authDomain: "ct2mri-95fc6.firebaseapp.com",
+    databaseURL: "https://ct2mri-95fc6-default-rtdb.firebaseio.com",
+    projectId: "ct2mri-95fc6",
+    storageBucket: "ct2mri-95fc6.appspot.com",
+    messagingSenderId: "717539683589",
+    appId: "1:717539683589:web:536c1630a895805ca5db6c",
+    measurementId: "G-RWYJ57ZW44"
+  };
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  var storageRef = firebase.storage().ref();
+  var firebaseRef = firebase.database().ref();
+
+  // FirebaseUI config.
+  var uiConfig = {
+      signInSuccessUrl: './mrievaluation.html',
+      signInOptions: [
+        // Leave the lines as is for the providers you want to offer your users.
+        //firebase.auth.GoogleAuthProvider.PROVIDER_ID,
+        firebase.auth.EmailAuthProvider.PROVIDER_ID,
+        //firebaseui.auth.AnonymousAuthProvider.PROVIDER_ID
+      ],
+      // tosUrl and privacyPolicyUrl accept either url string or a callback
+      // function.
+      // Terms of service url/callback.
+      tosUrl: '<your-tos-url>',
+      // Privacy policy url/callback.
+      privacyPolicyUrl: function() {
+        window.location.assign('<your-privacy-policy-url>');
+      }
+    };
+  // Initialize the FirebaseUI Widget using Firebase.
+  var ui = new firebaseui.auth.AuthUI(firebase.auth());
+  // The start method will wait until the DOM is loaded.
+  ui.start('#firebaseui-auth-container', uiConfig);
+
+  let userLoaded = false;
+  function getCurrentUser(auth) {
+    return new Promise((resolve, reject) => {
+      if (userLoaded) {
+            resolve(firebase.auth().currentUser);
+      }
+      const unsubscribe = auth.onAuthStateChanged(user => {
+          userLoaded = true;
+          unsubscribe();
+          resolve(user);
+      }, reject);
+    });
+  }
+
+  function logout() {
+    addEvaluation();
+    firebase.auth().signOut().then(function() {
+        // Sign-out successful.
+        redirectToLogIn();
+    }).catch(function(error) {
+        // An error happened.
+        let errorMessage = error.message;
+        alert(errorMessage);
+    });
+  }
+
+  function redirectToLogIn() {
+    var back_text = document.getElementById('back_text');
+    back_text.style.display = "none";
+    var next_text = document.getElementById('next_text');
+    next_text.style.display = "none";
+    var logout = document.getElementById('logout');
+    logout.style.display = "none";
+    var navi_pics = document.getElementById('navi_pics');
+    navi_pics.innerHTML = "";
+
+    var intro_text = document.getElementById('intro_text');
+    intro_text.innerHTML = "Please login before evaluation.";
+
+    document.getElementById('auth_login').style.display = "block";
+    document.getElementById('eval').style.display = "none";
+  }
+
+  function getEvaluation(uid)
+  {
+      var evaluationsRef = firebaseRef.child("evaluations");
+      evaluationsRef.orderByChild("uid").equalTo(uid).once("value", snap => {
+        if (!snap.exists()) {
+          nextSample();
+        }
+        snap.forEach( childSnap=> {
+          feedback_key = childSnap.key;
+          evaluation = childSnap.val()["feedback"];
+
+          // initial ...
+          ct_sample_index = childSnap.val()["current"];
+          picked_mods = evaluation[ct_sample_index];
+          all_pics_url = [];
+
+          if (picked_mods == null) {
+            picked_mods = [];
+          }
+
+          if (ct_sample_index == 0) {
+            nextSample();
+          } else {
+            updateSample();
+          }
+        });
+      });
+  }
+
+  function addEvaluation(  )
+  {
+    if (feedback_key == null) {
+      feedback_key = firebaseRef.child('evaluations').push().key;
+    }
+
+    var evalData = {
+      "uid": userid,
+      "current": ct_sample_index,
+      "feedback": evaluation
+    };
+
+    var updates = {}
+    updates['/evaluations/' + feedback_key] = evalData;
+    firebaseRef.update(updates);  
+  }
+
+</script>
+
+<script>
+  const ct_image_path = "./ct_images/";
+  const mri_image_path = "./mri_images/";
+  const max_ct_index = 82;
+  const max_pick_num = 4;
+  
+  const mri_models = ["unet_5_l1l2_50", 
+                      "unet_3_mae_200", 
+                      "unet_5_mae_150", 
+                      "resnet_15_3_mae_50", 
+                      "resnet_12_5_mae_100", 
+                      "resnet_9_5_l1l2_50", 
+                      "resnet_15_3_p_50", 
+                      "resnet_12_5_ssim_50"];
+
+  var ct_sample_index = 0;
+  var picked_mods = [];
+  var all_pics_url = [];
+  var evaluation = [];
+
+  Number.prototype.pad = function(size) {
+    var s = String(this);
+    while (s.length < (size || 2)) {s = "0" + s;}
+    return s;
+  }
+
+  function backSample() {
+    if (ct_sample_index <= 1) {
+      return;
+    }
+    
+    ct_sample_index -= 1;
+    picked_mods = evaluation[ct_sample_index];
+    all_pics_url = [];
+
+    if (picked_mods == null) {
+      picked_mods = [];
+    }
+
+    updateSample();
+  }
+
+  function nextSample() {
+    if (ct_sample_index >= max_ct_index) {
+      console.log(evaluation);
+      /*
+      if (!confirm('Are you sure you want to submit your evaluation into the database?')) {
+        return;
+      }
+      */
+
+      ct_sample_index = 0;
+      updateSample();
+      return;
+    }
+
+    ct_sample_index += 1;
+    picked_mods = evaluation[ct_sample_index];
+    all_pics_url = [];
+
+    if (picked_mods == null) {
+      picked_mods = [];
+    }
+
+    updateSample();
+  }
+
+  function updateSample() {
+    //save to database
+    addEvaluation();
+
+    // clean up the main pics area
+    main_html = "";
+    var main_pics = document.getElementById('main_pics');
+    main_pics.innerHTML = main_html;
+
+    // clean up the navi pics area
+    navi_html = "";
+    var navi_pics = document.getElementById('navi_pics');
+    navi_pics.innerHTML = navi_html;
+
+    // clean up the navi text area
+    var back_text = document.getElementById('back_text');
+    back_text.style.display = "none";
+    var next_text = document.getElementById('next_text');
+    var intro_text = document.getElementById('intro_text');
+    intro_text.innerHTML = "";
+
+    // update intro text area
+    if (ct_sample_index <= 0) {
+      intro_text.innerHTML = 'Thank you for your submission. If you want to resubmit, please click <a href="./mrievaluation.html">here</a>';
+      return;
+    } else {
+      intro_text.innerHTML = "Hi " + username + ", Please select MRI images in set " + ct_sample_index + " of " + max_ct_index + ".";
+    }
+
+    // update back text area
+    if (ct_sample_index > 1) {
+      back_text.style.display = "block";
+      back_text.innerHTML = "<h4 class=\"text-white\" >&#10096;Back</h4>";
+    }
+
+    // update next text area
+    next_text.style.display = "block";
+    if (ct_sample_index == max_ct_index) {
+      next_text.innerHTML = "<h4 class=\"text-white\" >Submit</h4>";
+    } else {
+      next_text.innerHTML = "<h4 class=\"text-white\" >Next&#10097;</h4>";
+    }
+    
+    // update the navi and main pics area
+    for (let i = 0; i < mri_models.length; i++) {
+      const mri_sample_path = mri_models[i] + "/" + (ct_sample_index-1).pad(4) + "_sharp_conserv.png";
+      var captured_ct_index = ct_sample_index;
+      storageRef.child(mri_sample_path).getDownloadURL().then(function(url) {
+        if (captured_ct_index != ct_sample_index) {
+          return; 
+        }
+
+        all_pics_url[i] = url;
+
+        picked_style = '';
+        if (picked_mods.indexOf(i) != -1) {
+          picked_style = 'style="background-color:#04AA6D;"';
+
+          navi_html += '<div class="card float-left" style="width:100px">' + 
+                    '<img class="card-img-top" src="' + url + '" alt="Card image">' + 
+                    '</div>';
+          navi_pics.innerHTML = navi_html;
+        }
+
+        main_html += '<div class="card float-left" style="width:256px">' + 
+                      '<div class="card-body" ' + picked_style + ' id="' + i + '">' + 
+                      '<h4 class="card-title">' + ( i + 1 ) + '</h4>' + 
+                      '</div>' + 
+                      '<img class="card-img-bottom" src="' + url + '" alt="Card image" style="width:100%" onclick="clickImage(' + i + ')">' + 
+                      '</div>';
+        main_pics.innerHTML = main_html;
+      }).catch(function(error) {
+      // Handle any errors
+      });
+    }
+  }
+
+  function clickImage(index) {
+    var duplicated = -1;
+    for (let i = 0; i < picked_mods.length; i++) {
+      if (picked_mods[i] == index) {
+        duplicated = i;
+        break;
+      }
+    }
+
+    if (duplicated >= 0) {
+      picked_mods.splice(duplicated, 1);
+      document.getElementById(index).style.backgroundColor ='#FFFFFF';
+    } else if (picked_mods.length < max_pick_num) {
+      picked_mods.push(index);
+      document.getElementById(index).style.backgroundColor ='#04AA6D';
+    } else {
+      var message = "You can only pick " + max_pick_num + " MRI images!";
+      alert(message);
+      return;
+    }
+
+    evaluation[ct_sample_index] = picked_mods;
+
+    navi_html = "";
+    var navi_pics = document.getElementById('navi_pics');
+    for (let i = 0; i < picked_mods.length; i++) {
+      navi_html += '<div class="card float-left" style="width:100px">' + 
+                   '<img class="card-img-top" src="' + all_pics_url[i] + '" alt="Card image">' + 
+                   '</div>';
+    }
+    navi_pics.innerHTML = navi_html;
+  }
+
+  document.getElementById('auth_login').style.display = "none";
+  document.getElementById('eval').style.display = "none";
+
+  var username = "";
+  var userid = "";
+  var feedback_key = null;
+
+  getCurrentUser(firebase.auth()).then(function(user) {
+    if (user) {
+      username = user.displayName;
+      userid = user.uid;
+      feedback_key = null;
+
+      var logout = document.getElementById('logout');
+      logout.style.display = "block"
+      logout.innerHTML = "<h4 class=\"text-white\" >Logout</h4>";
+
+      document.getElementById('auth_login').style.display = "none";
+      document.getElementById('eval').style.display = "block";
+
+      getEvaluation(user.uid);
+    } else {
+      redirectToLogIn();
+    }
+  });
+
+</script>
+
+</html>
