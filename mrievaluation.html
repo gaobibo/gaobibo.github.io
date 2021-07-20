@@ -148,7 +148,12 @@
         } else {
           snap.forEach(childSnap=> {
             feedback_key = childSnap.key;
-            evaluation = childSnap.val()["feedback"];
+
+            // load old evaluation if there is
+            old_evaluation = childSnap.val()["feedback"];
+            if (old_evaluation != null) {
+              evaluation = old_evaluation;
+            }
 
             // initial ...
             ct_sample_index = childSnap.val()["current"];
