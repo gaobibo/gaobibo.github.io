@@ -128,6 +128,7 @@
     next_text.style.display = "none";
     var logout = document.getElementById('logout');
     logout.style.display = "none";
+
     var navi_pics = document.getElementById('navi_pics');
     navi_pics.innerHTML = "";
 
@@ -144,26 +145,27 @@
       evaluationsRef.orderByChild("uid").equalTo(uid).once("value", snap => {
         if (!snap.exists()) {
           nextSample();
+        } else {
+          snap.forEach(childSnap=> {
+            feedback_key = childSnap.key;
+            evaluation = childSnap.val()["feedback"];
+
+            // initial ...
+            ct_sample_index = childSnap.val()["current"];
+            picked_mods = evaluation[ct_sample_index];
+            all_pics_url = [];
+
+            if (picked_mods == null) {
+              picked_mods = [];
+            }
+
+            if (ct_sample_index == 0) {
+              nextSample();
+            } else {
+              updateSample();
+            }
+          });
         }
-        snap.forEach( childSnap=> {
-          feedback_key = childSnap.key;
-          evaluation = childSnap.val()["feedback"];
-
-          // initial ...
-          ct_sample_index = childSnap.val()["current"];
-          picked_mods = evaluation[ct_sample_index];
-          all_pics_url = [];
-
-          if (picked_mods == null) {
-            picked_mods = [];
-          }
-
-          if (ct_sample_index == 0) {
-            nextSample();
-          } else {
-            updateSample();
-          }
-        });
       });
   }
 
@@ -236,7 +238,6 @@
         return;
       }
       */
-
       ct_sample_index = 0;
       updateSample();
       return;
@@ -271,6 +272,7 @@
     var back_text = document.getElementById('back_text');
     back_text.style.display = "none";
     var next_text = document.getElementById('next_text');
+    next_text.style.display = "none";
     var intro_text = document.getElementById('intro_text');
     intro_text.innerHTML = "";
 
@@ -285,15 +287,15 @@
     // update back text area
     if (ct_sample_index > 1) {
       back_text.style.display = "block";
-      back_text.innerHTML = "<h4 class=\"text-white\" >&#10096;Back</h4>";
+      back_text.innerHTML = "<h4 class=\"text-white\">&#10096;Back</h4>";
     }
 
     // update next text area
     next_text.style.display = "block";
     if (ct_sample_index == max_ct_index) {
-      next_text.innerHTML = "<h4 class=\"text-white\" >Submit</h4>";
+      next_text.innerHTML = "<h4 class=\"text-white\">Submit</h4>";
     } else {
-      next_text.innerHTML = "<h4 class=\"text-white\" >Next&#10097;</h4>";
+      next_text.innerHTML = "<h4 class=\"text-white\">Next&#10097;</h4>";
     }
     
     // update the navi and main pics area
@@ -312,8 +314,8 @@
           picked_style = 'style="background-color:#04AA6D;"';
 
           navi_html += '<div class="card float-left" style="width:100px">' + 
-                    '<img class="card-img-top" src="' + url + '" alt="Card image">' + 
-                    '</div>';
+                       '<img class="card-img-top" src="' + url + '" alt="Card image">' + 
+                       '</div>';
           navi_pics.innerHTML = navi_html;
         }
 
@@ -378,7 +380,7 @@
 
       var logout = document.getElementById('logout');
       logout.style.display = "block"
-      logout.innerHTML = "<h4 class=\"text-white\" >Logout</h4>";
+      logout.innerHTML = "<h4 class=\"text-white\">Logout</h4>";
 
       document.getElementById('auth_login').style.display = "none";
       document.getElementById('eval').style.display = "block";
