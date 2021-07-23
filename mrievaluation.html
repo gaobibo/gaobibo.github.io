@@ -327,7 +327,12 @@
 	
     // update main pics area
     for (let i = 0; i < mri_models.length; i++) {
-      const mri_sample_path = mri_models[i] + "/" + (ct_sample_index-1).pad(4) + "_sharp_conserv.png";
+	  var postfix = "_sharp_conserv.png";
+	  if(mri_models[i] == "ground_truth")
+	  {
+		postfix = ".png";
+	  }
+      const mri_sample_path = mri_models[i] + "/" + (ct_sample_index-1).pad(4) + postfix;
       var captured_ct_index = ct_sample_index;
       storageRef.child(mri_sample_path).getDownloadURL().then(function(url) {
         if (captured_ct_index != ct_sample_index) {
